@@ -30,17 +30,26 @@ graph LR
 
 ## Install
 
-Requires Node.js 18+.
+## Install
+
+The easiest way is the install script:
 
 ```sh
-git clone <repo-url> mdv
+git clone git@github.com:hughe/mdv.git
 cd mdv
 ./install.sh
 ```
 
-The script installs dependencies, compiles with `tsc`, and symlinks the
-`mdv` command into `~/.local/bin` (override with `MDV_BIN_DIR=...`). If the
-install directory isn't on your `PATH`, the script tells you how to add it.
+The script:
+
+1. Verifies Node.js 18+ and npm are installed
+2. Installs dependencies (`npm ci`)
+3. Compiles with `tsc` (`npm run build`)
+4. Symlinks the `mdv` command into `~/.local/bin` by default
+   (override with `MDV_BIN_DIR=... ./install.sh`)
+
+If the install directory isn't on your `PATH`, the script prints the exact
+`export PATH=...` line to add to your shell profile.
 
 To install manually instead:
 
