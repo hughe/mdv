@@ -16,10 +16,13 @@ Usage:
 Options:
   <markdown-file>  Path to a markdown (.md) file to render
   [port]           Optional port to listen on (default: 0 = random free port)
-  -w, --watch      Watch mode: reload on file changes, exit when the
-                   browser window closes
+  -n, --no-watch   One-shot mode: no live reload; shut down once the page
+                   has been served
   -v, --version    Show version
   -h, --help       Show this help
+
+By default mdv runs in watch mode: the page reloads when the file
+changes, and the server shuts down when the browser window closes.
 
 Starts a local web server rendering the file GitHub-style,
 then opens the URL in your default browser.
@@ -45,7 +48,7 @@ function fail(message: string): never {
 function parseArgs(argv: string[]) {
   let file: string | undefined;
   let port = 0;
-  let watch = false;
+  let watch = true;
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -57,7 +60,12 @@ function parseArgs(argv: string[]) {
       console.log(`mdv ${getVersion()}`);
       process.exit(0);
     }
+    if (arg === "-n" || arg === "--no-watch") {
+      watch = false;
+      continue;
+    }
     if (arg === "-w" || arg === "--watch") {
+      // Watch is now the default; keep the flag for compatibility.
       watch = true;
       continue;
     }

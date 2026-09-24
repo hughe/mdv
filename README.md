@@ -23,11 +23,10 @@ graph LR
   [highlight.js](https://highlightjs.org/) using the `github` theme
 - **Relative assets** — image links such as `![](image.png)` resolve against
   the markdown file's directory, mirroring GitHub repository-relative behavior
-- **Auto-shutdown** — once the page has been served and all connections
-  drain, the server shuts itself down after a short idle grace period
-- **Watch mode** (`--watch`/`-w`) — the rendered page stays connected over a
-  websocket; when the file changes it reloads instantly, and when you close
-  the browser window the server shuts itself down
+- **Auto-shutdown** — the server shuts down when you close the browser
+  window (default), or after serving once in one-shot mode (`--no-watch`)
+- **Live reload** (default) — the rendered page stays connected over a
+  websocket; when the file changes it reloads instantly
 - **Zero-config** — picks a random free port (or use your own), then opens the
   page in your default browser via the `open` command
 
@@ -70,22 +69,23 @@ mdv <markdown-file> [port]
 | ------- | ---------- |
 | `<markdown-file>` | Path to the markdown file to render |
 | `[port]` | Optional port to listen on (default: random free port) |
-| `-w`, `--watch` | Watch mode: reload on file changes, exit when the browser window closes |
+| `-n`, `--no-watch` | One-shot mode: no live reload; server exits after serving |
 
 Examples:
 
 ```sh
-mdv README.md           # random port, opens browser
+mdv README.md           # live reload, exits when the window closes
+mdv -w NOTES.md         # -w is the default (kept for compatibility)
 mdv docs/spec.md 8080   # specific port
-mdv -w NOTES.md         # watch mode: live reload
+mdv -n QUICK.md         # one-shot mode
 node dist/index.js test.md   # without npm link
 ```
 
 Starts a local web server on `127.0.0.1`, renders the file, and opens
-`http://localhost:<port>/` in your browser. In watch mode (`--watch`), the
+`http://localhost:<port>/` in your browser. In the default watch mode the
 page reloads whenever the file changes and the server exits when the browser
-window is closed; otherwise the server shuts down automatically once the
-page has been served. Press `Ctrl+C` to stop at any time.
+window is closed. With `--no-watch`, the server shuts down automatically
+once the page has been served. Press `Ctrl+C` to stop at any time.
 
 Set `MDV_NO_OPEN=1` to skip opening a browser (useful for headless
 environments).
@@ -118,8 +118,14 @@ You get a GitHub-styled page with a rendered flowchart diagram.
 ```sh
 npm install
 npm run build              # compile TypeScript to dist/
+npm test                   # build + run Playwright end-to-end tests
 node dist/index.js test.md # try it with the sample fixture
 ```
+
+The Playwright tests spawn the real CLI and drive it in headless Chromium,
+covering GFM/mermaid rendering, live reload, and auto-shutdown in both
+watch and one-shot modes. Browsers are managed by Playwright
+(`npx playwright install chromium` if missing).
 
 Layout:
 
@@ -127,7 +133,10 @@ Layout:
 src/
 ├── index.ts   # CLI entry point and HTTP server
 ├── render.ts  # markdown → GitHub-style HTML pipeline
+├── watch.ts   # watch mode: websocket live reload + exit-on-close
 └── util.ts    # helpers (HTML escaping)
+tests/
+└── mdv.spec.ts  # Playwright end-to-end tests
 ```
 
 Rendering assets (github-markdown-css, highlight.js, mermaid) are loaded from
