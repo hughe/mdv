@@ -23,6 +23,8 @@ graph LR
   [highlight.js](https://highlightjs.org/) using the `github` theme
 - **Relative assets** — image links such as `![](image.png)` resolve against
   the markdown file's directory, mirroring GitHub repository-relative behavior
+- **Auto-shutdown** — once the page has been served and all connections
+  drain, the server shuts itself down after a short idle grace period
 - **Zero-config** — picks a random free port (or use your own), then opens the
   page in your default browser via the `open` command
 
