@@ -1,0 +1,23 @@
+{
+  "name": "mdv",
+  "version": "1.0.0",
+  "description": "Markdown viewer CLI - renders a markdown file with Mermaid diagram support in a local web server",
+  "main": "dist/index.js",
+  "bin": {
+    "mdv": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "tsc && node dist/index.js"
+  },
+  "keywords": ["markdown", "mermaid", "viewer", "cli"],
+  "license": "MIT",
+  "dependencies": {
+    "highlight.js": "^11.10.0",
+    "marked": "^15.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  }
+}
