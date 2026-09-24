@@ -45,9 +45,26 @@ export function renderMarkdown(markdown: string): string {
  * Wrap rendered markdown HTML in a full page styled like GitHub.
  * Uses the same CDN assets GitHub-like renderers commonly rely on:
  * github-markdown-css, highlight.js github theme, and mermaid.
+ *
+ * In watch mode, a small client script connects back to the server over a
+ * websocket and reloads the page when the server says the file changed.
  */
-export function renderPage(markdown: string, title: string): string {
+export function renderPage(
+  markdown: string,
+  title: string,
+  opts: { watch?: boolean } = {}
+): string {
   const body = renderMarkdown(markdown);
+  const watchScript = opts.watch
+    ? `<script>
+(function () {
+  var proto = location.protocol === "https:" ? "wss:" : "ws:";
+  var ws = new WebSocket(proto + "//" + location.host);
+  ws.onmessage = function (e) {
+    try { if (JSON.parse(e.data).type === "changed") location.reload(); } catch (err) { /* ignore */ } };
+})();
+</script>`
+    : "";
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -89,6 +106,7 @@ export function renderPage(markdown: string, title: string): string {
 <body>
 <div class="markdown-body">
 ${body}
+${watchScript}
 </div>
 <script>
   mermaid.initialize({
@@ -109,9 +127,9 @@ ${body}
 `;
 }
 
-export function buildPageForFile(filePath: string): string {
+export function buildPageForFile(filePath: string, opts: { watch?: boolean } = {}): string {
   const abs = path.resolve(filePath);
   const content = fs.readFileSync(abs, "utf8");
   const title = path.basename(abs);
-  return renderPage(content, title);
+  return renderPage(content, title, opts);
 }

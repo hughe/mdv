@@ -5,6 +5,7 @@ import * as fsp from "fs/promises";
 import * as path from "path";
 import { spawn } from "child_process";
 import { buildPageForFile } from "./render";
+import { setupWatch } from "./watch";
 import { escapeHtml } from "./util";
 
 const USAGE = `mdv - markdown viewer with mermaid diagram support
@@ -15,6 +16,8 @@ Usage:
 Options:
   <markdown-file>  Path to a markdown (.md) file to render
   [port]           Optional port to listen on (default: 0 = random free port)
+  -w, --watch      Watch mode: reload on file changes, exit when the
+                   browser window closes
   -v, --version    Show version
   -h, --help       Show this help
 
@@ -42,6 +45,7 @@ function fail(message: string): never {
 function parseArgs(argv: string[]) {
   let file: string | undefined;
   let port = 0;
+  let watch = false;
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -52,6 +56,10 @@ function parseArgs(argv: string[]) {
     if (arg === "-v" || arg === "--version") {
       console.log(`mdv ${getVersion()}`);
       process.exit(0);
+    }
+    if (arg === "-w" || arg === "--watch") {
+      watch = true;
+      continue;
     }
     if (file === undefined) {
       file = arg;
@@ -67,7 +75,7 @@ function parseArgs(argv: string[]) {
   if (file === undefined) {
     fail("no markdown file given");
   }
-  return { file, port };
+  return { file, port, watch };
 }
 
 const MIME_TYPES: Record<string, string> = {
@@ -125,6 +133,10 @@ async function serveAsset(
 }
 
 function openUrl(url: string): void {
+  if (process.env.MDV_NO_OPEN) {
+    console.log(`MDV_NO_OPEN set; open manually: ${url}`);
+    return;
+  }
   // `open` (macOS) with fallbacks for other platforms.
   const candidates = process.platform === "darwin" ? ["open"] : ["xdg-open", "open"];
   for (const cmd of candidates) {
@@ -143,7 +155,7 @@ function openUrl(url: string): void {
 }
 
 function main(): void {
-  const { file, port } = parseArgs(process.argv.slice(2));
+  const { file, port, watch } = parseArgs(process.argv.slice(2));
 
   const absFile = path.resolve(file);
   if (!fs.existsSync(absFile) || !fs.statSync(absFile).isFile()) {
@@ -152,11 +164,8 @@ function main(): void {
   const baseDir = path.dirname(absFile);
 
   // ── auto-shutdown state ────────────────────────────────────────────────
-  // The server keeps running until the page has been served and every
-  // connection has finished (relative images are fetched after the HTML,
-  // and browser keep-alive sockets are closed via "Connection: close").
-  // Once idle, it shuts down after a short grace period in case the browser
-  // retries or the user refreshes.
+  // In watch mode the lifetime is tied to the websocket connection
+  // (the browser window), so the idle auto-shutdown does not apply.
   const IDLE_SHUTDOWN_MS = 3000;
   const sockets = new Set<http.IncomingMessage["socket"]>();
   let pageServed = false;
@@ -164,7 +173,7 @@ function main(): void {
   let server: http.Server;
 
   function maybeScheduleShutdown(): void {
-    if (!pageServed || sockets.size > 0 || shutdownTimer !== null) return;
+    if (watch || !pageServed || sockets.size > 0 || shutdownTimer !== null) return;
     shutdownTimer = setTimeout(() => {
       shutdownTimer = null;
       if (sockets.size === 0) {
@@ -190,7 +199,7 @@ function main(): void {
 
       // Serve the rendered markdown page.
       if (urlPath === "/" || urlPath === "/index.html") {
-        const html = buildPageForFile(absFile);
+        const html = buildPageForFile(absFile, { watch });
         res.writeHead(200, {
           "Content-Type": "text/html; charset=utf-8",
           "Cache-Control": "no-store",
@@ -230,12 +239,20 @@ function main(): void {
     });
   });
 
+  if (watch) {
+    setupWatch(server, absFile, (msg) => console.log(`mdv: ${msg}`));
+  }
+
   server.listen(port, "127.0.0.1", () => {
     const addr = server.address();
     const actualPort = typeof addr === "object" && addr !== null ? addr.port : port;
     const url = `http://localhost:${actualPort}/`;
     console.log(
-      `mdv: serving ${path.basename(absFile)} at ${url} (shuts down automatically once the page is served; Ctrl+C to stop)`
+      `mdv: serving ${path.basename(absFile)} at ${url} (` +
+        (watch
+          ? "watch mode: reloads on change, shuts down when the browser window closes"
+          : "shuts down automatically once the page is served") +
+        "; Ctrl+C to stop)"
     );
     openUrl(url);
   });

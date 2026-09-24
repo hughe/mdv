@@ -25,6 +25,9 @@ graph LR
   the markdown file's directory, mirroring GitHub repository-relative behavior
 - **Auto-shutdown** — once the page has been served and all connections
   drain, the server shuts itself down after a short idle grace period
+- **Watch mode** (`--watch`/`-w`) — the rendered page stays connected over a
+  websocket; when the file changes it reloads instantly, and when you close
+  the browser window the server shuts itself down
 - **Zero-config** — picks a random free port (or use your own), then opens the
   page in your default browser via the `open` command
 
@@ -67,17 +70,25 @@ mdv <markdown-file> [port]
 | ------- | ---------- |
 | `<markdown-file>` | Path to the markdown file to render |
 | `[port]` | Optional port to listen on (default: random free port) |
+| `-w`, `--watch` | Watch mode: reload on file changes, exit when the browser window closes |
 
 Examples:
 
 ```sh
 mdv README.md           # random port, opens browser
 mdv docs/spec.md 8080   # specific port
+mdv -w NOTES.md         # watch mode: live reload
 node dist/index.js test.md   # without npm link
 ```
 
 Starts a local web server on `127.0.0.1`, renders the file, and opens
-`http://localhost:<port>/` in your browser. Press `Ctrl+C` to stop.
+`http://localhost:<port>/` in your browser. In watch mode (`--watch`), the
+page reloads whenever the file changes and the server exits when the browser
+window is closed; otherwise the server shuts down automatically once the
+page has been served. Press `Ctrl+C` to stop at any time.
+
+Set `MDV_NO_OPEN=1` to skip opening a browser (useful for headless
+environments).
 
 ## Options
 
