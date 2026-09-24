@@ -124,6 +124,12 @@ src/
 Rendering assets (github-markdown-css, highlight.js, mermaid) are loaded from
 CDNs at page load, so no bundling step is needed.
 
+## Acknowledgements
+
+This project was entirely vibe coded — [pi](https://github.com/earendil-works/pi-coding-agent)
+(powered by GLM) wrote all of the code from a series of natural-language
+prompts.
+
 ## License
 
 MIT
