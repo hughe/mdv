@@ -135,12 +135,39 @@ function main(): void {
   }
   const baseDir = path.dirname(absFile);
 
-  const server = http.createServer(async (req, res) => {
+  // ── auto-shutdown state ────────────────────────────────────────────────
+  // The server keeps running until the page has been served and every
+  // connection has finished (relative images are fetched after the HTML,
+  // and browser keep-alive sockets are closed via "Connection: close").
+  // Once idle, it shuts down after a short grace period in case the browser
+  // retries or the user refreshes.
+  const IDLE_SHUTDOWN_MS = 3000;
+  const sockets = new Set<http.IncomingMessage["socket"]>();
+  let pageServed = false;
+  let shutdownTimer: NodeJS.Timeout | null = null;
+  let server: http.Server;
+
+  function maybeScheduleShutdown(): void {
+    if (!pageServed || sockets.size > 0 || shutdownTimer !== null) return;
+    shutdownTimer = setTimeout(() => {
+      shutdownTimer = null;
+      if (sockets.size === 0) {
+        console.log("mdv: page served; shutting down");
+        server.close(() => process.exit(0));
+        // In case close callbacks never fire (lingering handles):
+        setTimeout(() => process.exit(0), 1000).unref();
+      } else {
+        maybeScheduleShutdown();
+      }
+    }, IDLE_SHUTDOWN_MS);
+  }
+
+  server = http.createServer(async (req, res) => {
     const urlPath = (req.url || "/").split("?")[0];
 
     try {
       if (req.method !== "GET" && req.method !== "HEAD") {
-        res.writeHead(405, { "Content-Type": "text/plain" });
+        res.writeHead(405, { "Content-Type": "text/plain", Connection: "close" });
         res.end("Method Not Allowed");
         return;
       }
@@ -151,8 +178,10 @@ function main(): void {
         res.writeHead(200, {
           "Content-Type": "text/html; charset=utf-8",
           "Cache-Control": "no-store",
+          Connection: "close",
         });
         res.end(req.method === "HEAD" ? undefined : html);
+        pageServed = true;
         return;
       }
 
@@ -161,22 +190,37 @@ function main(): void {
         return;
       }
 
-      res.writeHead(404, { "Content-Type": "text/html; charset=utf-8" });
+      res.writeHead(404, {
+        "Content-Type": "text/html; charset=utf-8",
+        Connection: "close",
+      });
       res.end(
         `<h1>404 Not Found</h1><p>${escapeHtml(urlPath)} was not found next to <code>${escapeHtml(absFile)}</code></p>`
       );
     } catch (err) {
       console.error(err);
-      res.writeHead(500, { "Content-Type": "text/plain" });
+      res.writeHead(500, { "Content-Type": "text/plain", Connection: "close" });
       res.end("Internal Server Error");
     }
+  });
+
+  // Track open connections; when the page is served and they all drain,
+  // schedule the automatic shutdown.
+  server.on("connection", (socket) => {
+    sockets.add(socket);
+    socket.on("close", () => {
+      sockets.delete(socket);
+      maybeScheduleShutdown();
+    });
   });
 
   server.listen(port, "127.0.0.1", () => {
     const addr = server.address();
     const actualPort = typeof addr === "object" && addr !== null ? addr.port : port;
     const url = `http://localhost:${actualPort}/`;
-    console.log(`mdv: serving ${path.basename(absFile)} at ${url} (Ctrl+C to stop)`);
+    console.log(
+      `mdv: serving ${path.basename(absFile)} at ${url} (shuts down automatically once the page is served; Ctrl+C to stop)`
+    );
     openUrl(url);
   });
 
