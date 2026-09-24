@@ -1,48 +1,108 @@
-# mdv
+# mdv — Markdown Viewer
 
-A CLI tool that renders a local Markdown file in your browser, as close as
-possible to how GitHub renders it, including **Mermaid** diagrams.
+`mdv` is a small CLI tool that renders a local Markdown file in your browser,
+as close as possible to the way GitHub renders it — including **Mermaid**
+diagrams.
+
+```mermaid
+graph LR
+    A[mdv file.md] --> B[Local web server]
+    B --> C[Open browser]
+    C --> D["GitHub-style render with Mermaid"]
+```
+
+## Features
+
+- **GitHub Flavored Markdown** — tables, task lists, strikethrough, autolinks,
+  and more, rendered with the same CSS GitHub uses
+  ([github-markdown-css](https://github.com/sindresorhus/github-markdown-css))
+- **Mermaid diagram support** — ` ```mermaid ` code fences are rendered as
+  diagrams, just like on GitHub (flowcharts, sequence diagrams, gantt
+  charts, …)
+- **Syntax highlighting** — code fences highlighted with
+  [highlight.js](https://highlightjs.org/) using the `github` theme
+- **Relative assets** — image links such as `![](image.png)` resolve against
+  the markdown file's directory, mirroring GitHub repository-relative behavior
+- **Zero-config** — picks a random free port (or use your own), then opens the
+  page in your default browser via the `open` command
+
+## Install
+
+Requires Node.js 18+.
+
+```sh
+git clone <repo-url> mdv
+cd mdv
+npm install
+npm run build
+npm link        # optional: puts `mdv` on your PATH
+```
 
 ## Usage
 
 ```sh
-npm install && npm run build
-node dist/index.js <markdown-file> [port]
+mdv <markdown-file> [port]
 ```
 
-Example:
+| Argument | Description |
+| ------- | ---------- |
+| `<markdown-file>` | Path to the markdown file to render |
+| `[port]` | Optional port to listen on (default: random free port) |
+
+Examples:
 
 ```sh
-node dist/index.js README.md 8080
+mdv README.md           # random port, opens browser
+mdv docs/spec.md 8080   # specific port
+node dist/index.js test.md   # without npm link
 ```
 
-Starts a local web server (random free port unless `port` is given), then
-opens the URL in your default browser via the `open` command.
+Starts a local web server on `127.0.0.1`, renders the file, and opens
+`http://localhost:<port>/` in your browser. Press `Ctrl+C` to stop.
 
-## GitHub-faithful rendering
+## Options
 
-- [GitHub Flavored Markdown](https://github.github.com/gfm/) via `marked`
-  (tables, task lists, strikethrough, autolinks, …)
-- [`github-markdown-css`](https://github.com/sindresorhus/github-markdown-css)
-  for pixel-accurate GitHub styling
-- `highlight.js` with the `github` theme for syntax highlighting
-- [Mermaid](https://mermaid.js.org/) v11 (loaded from CDN) for `mermaid` code
-  fences, rendered as diagrams just like on GitHub
+```
+-h, --help    Show help
+```
 
-Relative image links (`![](image.png)`) resolve against the markdown file's
-directory, mirroring GitHub repository-relative behavior.
+## What it looks like
+
+Given this markdown:
+
+````markdown
+## Deployment
+
+```mermaid
+graph TD
+    A[Push] --> B{CI passes?}
+    B -- yes --> C[Deploy]
+    B -- no --> D[Fix]
+```
+````
+
+You get a GitHub-styled page with a rendered flowchart diagram.
 
 ## Development
 
 ```sh
 npm install
-npm run build   # tsc -> dist/
-npm test        # manual: try with test.md
+npm run build              # compile TypeScript to dist/
+node dist/index.js test.md # try it with the sample fixture
 ```
 
-## Install globally
+Layout:
 
-```sh
-npm link
-mdv any-file.md
 ```
+src/
+├── index.ts   # CLI entry point and HTTP server
+├── render.ts  # markdown → GitHub-style HTML pipeline
+└── util.ts    # helpers (HTML escaping)
+```
+
+Rendering assets (github-markdown-css, highlight.js, mermaid) are loaded from
+CDNs at page load, so no bundling step is needed.
+
+## License
+
+MIT
