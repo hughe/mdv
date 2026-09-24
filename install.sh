@@ -33,7 +33,11 @@ fi
 
 info "Building"
 npm run build
-[ -x dist/index.js ] || die "build did not produce dist/index.js"
+[ -f dist/index.js ] || die "build did not produce dist/index.js"
+
+# tsc does not set the executable bit; the CLI has a shebang and is
+# invoked directly through the symlink, so make it executable.
+chmod +x dist/index.js
 
 # ── install the binary ────────────────────────────────────────────────────
 BIN_DIR=${MDV_BIN_DIR:-$HOME/.local/bin}
