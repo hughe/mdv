@@ -30,8 +30,6 @@ graph LR
 
 ## Install
 
-## Install
-
 The easiest way is the install script:
 
 ```sh
