@@ -33,9 +33,19 @@ Requires Node.js 18+.
 ```sh
 git clone <repo-url> mdv
 cd mdv
+./install.sh
+```
+
+The script installs dependencies, compiles with `tsc`, and symlinks the
+`mdv` command into `~/.local/bin` (override with `MDV_BIN_DIR=...`). If the
+install directory isn't on your `PATH`, the script tells you how to add it.
+
+To install manually instead:
+
+```sh
 npm install
 npm run build
-npm link        # optional: puts `mdv` on your PATH
+npm link        # alternative: puts `mdv` on your PATH via npm
 ```
 
 ## Usage
