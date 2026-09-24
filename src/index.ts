@@ -15,11 +15,23 @@ Usage:
 Options:
   <markdown-file>  Path to a markdown (.md) file to render
   [port]           Optional port to listen on (default: 0 = random free port)
+  -v, --version    Show version
   -h, --help       Show this help
 
 Starts a local web server rendering the file GitHub-style,
 then opens the URL in your default browser.
 `;
+
+function getVersion(): string {
+  // dist/index.js lives one level below package.json
+  const pkgPath = path.join(__dirname, "..", "package.json");
+  try {
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+    return pkg.version;
+  } catch {
+    return "unknown";
+  }
+}
 
 function fail(message: string): never {
   console.error(`error: ${message}\n`);
@@ -35,6 +47,10 @@ function parseArgs(argv: string[]) {
     const arg = argv[i];
     if (arg === "-h" || arg === "--help") {
       console.log(USAGE);
+      process.exit(0);
+    }
+    if (arg === "-v" || arg === "--version") {
+      console.log(`mdv ${getVersion()}`);
       process.exit(0);
     }
     if (file === undefined) {
