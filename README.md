@@ -16,6 +16,8 @@ graph LR
 - **GitHub Flavored Markdown** — tables, task lists, strikethrough, autolinks,
   and more, rendered with the same CSS GitHub uses
   ([github-markdown-css](https://github.com/sindresorhus/github-markdown-css))
+- **YAML front matter** — Obsidian-style `---` front matter at the top of a
+  file renders as a table with bold keys, just like on GitHub
 - **Mermaid diagram support** — ` ```mermaid ` code fences are rendered as
   diagrams, just like on GitHub (flowcharts, sequence diagrams, gantt
   charts, …)

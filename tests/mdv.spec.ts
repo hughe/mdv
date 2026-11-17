@@ -125,6 +125,34 @@ test("renders GFM features and mermaid diagram", async ({ page }) => {
   server.kill();
 });
 
+test("renders YAML front matter as a table", async ({ page }) => {
+  const file = makeTempFile(
+    "---\ntitle: My Note\ndate: 2024-06-01\ntags:\n  - mdv\n  - markdown\naliases: [Note, \"My note\"]\ndraft: false\n---\n\n# Body\n\nFRONT-MATTER-BODY-MARKER\n"
+  );
+  const server = await startServer([file]);
+
+  await page.goto(server.url);
+
+  // Front matter renders as a headerless table with bold keys.
+  const rows = page.locator("table tbody tr");
+  await expect(rows).toHaveCount(5);
+  await expect(rows.nth(0).locator("td")).toHaveText([
+    "title",
+    "My Note",
+  ]);
+  await expect(rows.nth(0).locator("td strong")).toHaveText("title");
+  await expect(rows.nth(2).locator("td")).toHaveText(["tags", "mdv, markdown"]);
+  await expect(rows.nth(3).locator("td")).toHaveText(["aliases", "Note, My note"]);
+  await expect(rows.nth(4).locator("td")).toHaveText(["draft", "false"]);
+  await expect(page.locator("table thead")).toHaveCount(0);
+
+  // The document body below the front matter still renders.
+  await expect(page.locator("h1")).toHaveText("Body");
+  await expect(page.locator("text=FRONT-MATTER-BODY-MARKER")).toBeVisible();
+
+  server.kill();
+});
+
 test("mermaid fences render diagrams", async ({ page }) => {
   const file = makeTempFile(
     "# Diagrams\n\n```mermaid\nsequenceDiagram\n    A->>B: hi\n```\n"

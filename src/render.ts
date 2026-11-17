@@ -31,11 +31,110 @@ const renderer = {
 
 marked.use({ renderer });
 
+const FRONT_MATTER_RE =
+  /^---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
+
+interface FrontMatter {
+  properties: Map<string, string[]>;
+  body: string;
+}
+
+/**
+ * Strip a leading YAML front matter block (Obsidian-style properties) from
+ * the document. Returns null when the document does not start with one.
+ */
+function splitFrontMatter(markdown: string): FrontMatter | null {
+  const m = markdown.match(FRONT_MATTER_RE);
+  if (!m) return null;
+  const properties = parseFrontMatter(m[1]);
+  if (!properties) return null;
+  return { properties, body: markdown.slice(m[0].length) };
+}
+
+/**
+ * Minimal YAML subset parser for front matter: scalars, quoted strings,
+ * inline arrays (`[a, b]`), and block lists (`- item`). Nested maps are not
+ * supported; on anything unparseable it returns null so the document is
+ * rendered as-is.
+ */
+function parseFrontMatter(text: string): Map<string, string[]> | null {
+  const properties = new Map<string, string[]>();
+  let lastKey: string | null = null;
+
+  for (const raw of text.split(/\r?\n/)) {
+    if (raw.trim() === "" || raw.trimStart().startsWith("#")) continue;
+
+    // Block list item belonging to the previous key.
+    const listItem = raw.match(/^\s+-\s+(.*)$/);
+    if (listItem) {
+      if (lastKey === null) return null;
+      properties.get(lastKey)!.push(parseScalar(listItem[1]));
+      continue;
+    }
+
+    // Anything else indented (nested maps, etc.) is unsupported.
+    if (/^\s+/.test(raw)) return null;
+
+    const kv = raw.match(/^([^:]+):(?:[ \t]+(.*))?$/);
+    if (!kv) return null;
+
+    const key = kv[1].trim();
+    let value = (kv[2] ?? "").trim();
+
+    if (value.startsWith("[")) {
+      // Inline array: split on commas, respecting double quotes.
+      const inner = value.replace(/^\[|\]$/g, "");
+      const items = inner
+        .match(/"[^"]*"|[^,]+/g)
+        ?.map((item) => parseScalar(item.trim())) ?? [];
+      properties.set(key, items);
+    } else {
+      properties.set(key, value === "" ? [] : [parseScalar(value)]);
+    }
+    lastKey = key;
+  }
+
+  return properties.size > 0 ? properties : null;
+}
+
+/** Strip surrounding quotes and trailing comments from a scalar value. */
+function parseScalar(value: string): string {
+  if (/^"[^"]*"$/.test(value) || /^'[^']*'$/.test(value)) {
+    return value.slice(1, -1);
+  }
+  return value.replace(/\s+#.*$/, "").trim();
+}
+
+/**
+ * Render front matter properties as a headerless two-column table with
+ * bold keys, similar to how GitHub renders front matter.
+ */
+function renderFrontMatterTable(properties: Map<string, string[]>): string {
+  const cell = (text: string) =>
+    escapeHtml(text).replace(/\|/g, "&#124;");
+  const rows = [...properties]
+    .map(
+      ([key, values]) =>
+        `<tr><td><strong>${cell(key)}</strong></td><td>${cell(
+          values.join(", ")
+        )}</td></tr>`
+    )
+    .join("");
+  return `<table><tbody>${rows}</tbody></table>`;
+}
+
 export function renderMarkdown(markdown: string): string {
+  const frontMatter = splitFrontMatter(markdown);
+  let tableHtml = "";
+  if (frontMatter) {
+    tableHtml = renderFrontMatterTable(frontMatter.properties) + "\n";
+    markdown = frontMatter.body;
+  }
   const html = marked.parse(markdown, { async: false }) as string;
+  const body = tableHtml + html;
   // marked emits GFM task list checkboxes but not the `task-list-item` class
   // that github-markdown-css relies on to hide the list bullet.
-  return html.replace(
+  return body.replace(
     /<li><input (checked="" )?disabled="" type="checkbox">/g,
     (match) => match.replace("<li>", '<li class="task-list-item">')
   );
