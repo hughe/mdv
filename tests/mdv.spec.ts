@@ -18,10 +18,13 @@ interface ServerHandle {
  * Spawn the mdv CLI and wait until it logs its serving URL.
  * MDV_NO_OPEN keeps it from trying to open a browser.
  */
-function startServer(args: string[]): Promise<ServerHandle> {
+function startServer(
+  args: string[],
+  env: Record<string, string> = {}
+): Promise<ServerHandle> {
   return new Promise((resolve, reject) => {
     const proc = spawn(process.execPath, [BIN, ...args], {
-      env: { ...process.env, MDV_NO_OPEN: "1" },
+      env: { ...process.env, MDV_NO_OPEN: "1", MDV_HOST: "", ...env },
       stdio: ["ignore", "pipe", "pipe"],
     });
 
@@ -42,7 +45,9 @@ function startServer(args: string[]): Promise<ServerHandle> {
     );
 
     proc.stdout!.on("data", (chunk: Buffer) => {
-      const m = chunk.toString().match(/http:\/\/localhost:(\d+)\//);
+      const m = chunk
+        .toString()
+        .match(/http:\/\/(?:\[[^\]]+\]|[^:/\s]+):\d+\//);
       if (m && !settled) {
         settled = true;
         clearTimeout(timeout);
@@ -166,6 +171,35 @@ test("mermaid fences render diagrams", async ({ page }) => {
   server.kill();
 });
 
+test("--host binds to and generates a URL for the requested host", async ({
+  page,
+}) => {
+  const file = makeTempFile("# Custom host\n");
+  const server = await startServer(["--host=127.0.0.1", file], {
+    MDV_HOST: "localhost",
+  });
+
+  // The command-line flag takes precedence over MDV_HOST.
+  expect(server.url).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/$/);
+  await page.goto(server.url);
+  await expect(page.locator("h1")).toHaveText("Custom host");
+
+  server.kill();
+});
+
+test("MDV_HOST binds to and generates a URL for the requested host", async ({
+  page,
+}) => {
+  const file = makeTempFile("# Environment host\n");
+  const server = await startServer([file], { MDV_HOST: "localhost" });
+
+  expect(server.url).toMatch(/^http:\/\/localhost:\d+\/$/);
+  await page.goto(server.url);
+  await expect(page.locator("h1")).toHaveText("Environment host");
+
+  server.kill();
+});
+
 test("one-shot mode (--no-watch) exits after serving", async ({ page }) => {
   const file = makeTempFile(SAMPLE);
   const server = await startServer([file, "-n"]);
@@ -208,4 +242,6 @@ test("--help prints usage", () => {
   const out = execFileSync(process.execPath, [BIN, "--help"], { encoding: "utf8" });
   expect(out).toContain("Usage:");
   expect(out).toContain("--no-watch");
+  expect(out).toContain("--host <host>");
+  expect(out).toContain("MDV_HOST");
 });

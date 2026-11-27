@@ -11,11 +11,13 @@ import { escapeHtml } from "./util";
 const USAGE = `mdv - markdown viewer with mermaid diagram support
 
 Usage:
-  mdv <markdown-file> [port]
+  mdv [--host <host>] <markdown-file> [port]
 
 Options:
   <markdown-file>  Path to a markdown (.md) file to render
   [port]           Optional port to listen on (default: 0 = random free port)
+  --host <host>    Interface address or hostname to listen on
+                   (default: MDV_HOST or 127.0.0.1)
   -n, --no-watch   One-shot mode: no live reload; shut down once the page
                    has been served
   -v, --version    Show version
@@ -48,6 +50,8 @@ function fail(message: string): never {
 function parseArgs(argv: string[]) {
   let file: string | undefined;
   let port = 0;
+  const envHost = process.env.MDV_HOST?.trim();
+  let host = (envHost || "127.0.0.1").replace(/^\[|\]$/g, "");
   let watch = true;
 
   for (let i = 0; i < argv.length; i++) {
@@ -59,6 +63,20 @@ function parseArgs(argv: string[]) {
     if (arg === "-v" || arg === "--version") {
       console.log(`mdv ${getVersion()}`);
       process.exit(0);
+    }
+    if (arg === "--host") {
+      const value = argv[++i];
+      if (value === undefined || value.trim() === "") {
+        fail("--host requires an address or hostname");
+      }
+      host = value.trim().replace(/^\[|\]$/g, "");
+      continue;
+    }
+    if (arg.startsWith("--host=")) {
+      const value = arg.slice("--host=".length).trim();
+      if (value === "") fail("--host requires an address or hostname");
+      host = value.replace(/^\[|\]$/g, "");
+      continue;
     }
     if (arg === "-n" || arg === "--no-watch") {
       watch = false;
@@ -83,7 +101,13 @@ function parseArgs(argv: string[]) {
   if (file === undefined) {
     fail("no markdown file given");
   }
-  return { file, port, watch };
+  return { file, port, host, watch };
+}
+
+/** Format a listen host for use as the authority in an HTTP URL. */
+function urlHost(host: string): string {
+  const escaped = host.replace(/%/g, "%25");
+  return escaped.includes(":") ? `[${escaped}]` : escaped;
 }
 
 const MIME_TYPES: Record<string, string> = {
@@ -163,7 +187,7 @@ function openUrl(url: string): void {
 }
 
 function main(): void {
-  const { file, port, watch } = parseArgs(process.argv.slice(2));
+  const { file, port, host, watch } = parseArgs(process.argv.slice(2));
 
   const absFile = path.resolve(file);
   if (!fs.existsSync(absFile) || !fs.statSync(absFile).isFile()) {
@@ -251,10 +275,15 @@ function main(): void {
     setupWatch(server, absFile, (msg) => console.log(`mdv: ${msg}`));
   }
 
-  server.listen(port, "127.0.0.1", () => {
+  server.on("error", (err) => {
+    console.error(`error: could not listen on ${host}:${port}: ${err.message}`);
+    process.exit(1);
+  });
+
+  server.listen(port, host, () => {
     const addr = server.address();
     const actualPort = typeof addr === "object" && addr !== null ? addr.port : port;
-    const url = `http://localhost:${actualPort}/`;
+    const url = `http://${urlHost(host)}:${actualPort}/`;
     console.log(
       `mdv: serving ${path.basename(absFile)} at ${url} (` +
         (watch

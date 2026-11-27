@@ -31,6 +31,8 @@ graph LR
   websocket; when the file changes it reloads instantly
 - **Zero-config** — picks a random free port (or use your own), then opens the
   page in your default browser via the `open` command
+- **Configurable interface** — listen on another address or hostname with
+  `--host` or the `MDV_HOST` environment variable
 
 ## Install
 
@@ -64,13 +66,14 @@ npm link        # alternative: puts `mdv` on your PATH via npm
 ## Usage
 
 ```sh
-mdv <markdown-file> [port]
+mdv [--host <host>] <markdown-file> [port]
 ```
 
 | Argument | Description |
 | ------- | ---------- |
 | `<markdown-file>` | Path to the markdown file to render |
 | `[port]` | Optional port to listen on (default: random free port) |
+| `--host <host>` | Interface address or hostname (default: `MDV_HOST` or `127.0.0.1`) |
 | `-n`, `--no-watch` | One-shot mode: no live reload; server exits after serving |
 
 Examples:
@@ -79,23 +82,31 @@ Examples:
 mdv README.md           # live reload, exits when the window closes
 mdv -w NOTES.md         # -w is the default (kept for compatibility)
 mdv docs/spec.md 8080   # specific port
+mdv --host 0.0.0.0 README.md 8080  # listen on all interfaces
+MDV_HOST=192.168.1.20 mdv README.md # host from the environment
 mdv -n QUICK.md         # one-shot mode
 node dist/index.js test.md   # without npm link
 ```
 
-Starts a local web server on `127.0.0.1`, renders the file, and opens
-`http://localhost:<port>/` in your browser. In the default watch mode the
-page reloads whenever the file changes and the server exits when the browser
-window is closed. With `--no-watch`, the server shuts down automatically
-once the page has been served. Press `Ctrl+C` to stop at any time.
+Starts a local web server on `127.0.0.1` by default, renders the file, and
+opens its URL in your browser. Use `--host <address-or-hostname>` or
+`MDV_HOST` to listen elsewhere; `--host` takes precedence. In the default
+watch mode the page reloads whenever the file changes and the server exits
+when the browser window is closed. With `--no-watch`, the server shuts down
+automatically once the page has been served. Press `Ctrl+C` to stop at any
+time.
 
-Set `MDV_NO_OPEN=1` to skip opening a browser (useful for headless
-environments).
+Binding to a non-loopback host such as `0.0.0.0` exposes the rendered page
+and relative assets to the network. Set `MDV_NO_OPEN=1` to skip opening a
+browser (useful for headless environments).
 
 ## Options
 
 ```
--h, --help    Show help
+--host <host>  Interface address or hostname to listen on
+-n, --no-watch One-shot mode
+-v, --version  Show version
+-h, --help     Show help
 ```
 
 ## What it looks like
